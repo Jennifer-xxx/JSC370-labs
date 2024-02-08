@@ -102,51 +102,13 @@ the MET data.
 library(data.table)
 library(dtplyr)
 library(dplyr)
-```
-
-    ## 
-    ## Attaching package: 'dplyr'
-
-    ## The following objects are masked from 'package:data.table':
-    ## 
-    ##     between, first, last
-
-    ## The following objects are masked from 'package:stats':
-    ## 
-    ##     filter, lag
-
-    ## The following objects are masked from 'package:base':
-    ## 
-    ##     intersect, setdiff, setequal, union
-
-``` r
 library(mgcv)
-```
-
-    ## Loading required package: nlme
-
-    ## 
-    ## Attaching package: 'nlme'
-
-    ## The following object is masked from 'package:dplyr':
-    ## 
-    ##     collapse
-
-    ## This is mgcv 1.9-0. For overview type 'help("mgcv-package")'.
-
-``` r
 library(ggplot2)
 library(leaflet)
-library(tidyr)
 library(kableExtra)
+library(tidyr)
+library(webshot)
 ```
-
-    ## 
-    ## Attaching package: 'kableExtra'
-
-    ## The following object is masked from 'package:dplyr':
-    ## 
-    ##     group_rows
 
 ``` r
 fn <- "https://raw.githubusercontent.com/JSC370/JSC370-2024/main/data/met_all_2023.gz"
@@ -1437,10 +1399,133 @@ need the `mgcv` package and `gam()` function to do this.
   smooth line.
 
 - fit both a linear model and a spline model (use `gam()` with a cubic
-  regression spline on wind speed). Summarize and plot the results from
-  the models and interpret which model is the best fit and why.
+  regression spline on atmospheric pressure). Summarize and plot the
+  results from the models and interpret which model is the best fit and
+  why.
 
-## Deliverables
+``` r
+# Create a lazy table
+met_lz <- lazy_dt(station_median, immutable = FALSE)
+
+# Filter out values of atmospheric pressure outside of the range 1000 to 1020
+met_lz <- met_lz %>%
+  filter(atm.press_50 >= 1000 & atm.press_50 <= 1020)
+
+# Create a scatterplot of temperature (y) and atmospheric pressure (x) using ggplot2.
+ggplot(as.data.table(met_lz), aes(x = atm.press_50, y = temp_50)) +
+  geom_point() +
+  geom_smooth(method = "lm", 
+              formula = y ~ x,
+              se = FALSE, 
+              color = "blue") +
+  geom_smooth(method = "gam", 
+              formula = y ~ s(x, bs="cr"),
+              se = FALSE, 
+              color = "red") +
+  labs(x = "Atmospheric Pressure", y = "Temperature")
+```
+
+![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
+# Fit a linear model
+linear_model <- lm(temp_50 ~ atm.press_50, data = met_lz)
+# Summarize linear model
+summary(linear_model)
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = temp_50 ~ atm.press_50, data = met_lz)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -14.3696  -2.6206   0.1823   2.3008  11.6357 
+    ## 
+    ## Coefficients:
+    ##                Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)  1175.08603   58.52705   20.08   <2e-16 ***
+    ## atm.press_50   -1.14078    0.05785  -19.72   <2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 3.759 on 1083 degrees of freedom
+    ## Multiple R-squared:  0.2642, Adjusted R-squared:  0.2635 
+    ## F-statistic: 388.9 on 1 and 1083 DF,  p-value: < 2.2e-16
+
+``` r
+# Fit a spline model using gam
+spline_model <- gam(temp_50 ~ s(atm.press_50, bs="cr"), data = as.data.table(met_lz))
+# Summarize spline model
+summary(spline_model)
+```
+
+    ## 
+    ## Family: gaussian 
+    ## Link function: identity 
+    ## 
+    ## Formula:
+    ## temp_50 ~ s(atm.press_50, bs = "cr")
+    ## 
+    ## Parametric coefficients:
+    ##             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)  20.9400     0.1116   187.7   <2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Approximate significance of smooth terms:
+    ##                   edf Ref.df    F p-value    
+    ## s(atm.press_50) 8.666  8.967 51.4  <2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## R-sq.(adj) =  0.296   Deviance explained = 30.2%
+    ## GCV =  13.63  Scale est. = 13.508    n = 1085
+
+``` r
+# Plot results from both models
+plot(spline_model)
+```
+
+![](README_files/figure-gfm/unnamed-chunk-9-2.png)<!-- -->
+
+``` r
+par(mfrow=c(2,2))
+plot(linear_model)
+```
+
+![](README_files/figure-gfm/unnamed-chunk-9-3.png)<!-- -->
+
+**Answer:** - From the scatterplot, we can see that both the linear
+regression line and the smooth line are going down as atmospheric
+pressure increases with a moderate absolute slope. This indicates that
+as atmospheric pressure increases, temperature tends to go down. There
+is a moderate negative relationship between temperature and atmospheric
+pressure.
+
+- For the fitted linear model, the p-value \< 2.2e-16, which is very
+  small, indicating that we have strong evidence against the null
+  hypothesis. Additionally, the fitted slope is -1.14078, indicating
+  that as atmospheric pressure increases by 1, temperature goes down by
+  1.14 °C on averages. There is a linear negative relationship between
+  temperature and atmospheric pressure. Also, the linear model has a
+  residual standard error 3.759 and R-squared 0.2642.
+
+- For the fitted spline model, the p-value of coefficients and smooth
+  terms are both \<2e-16, which indicates that we have strong evidence
+  against both null hypothesis. Additionally, the estimated coefficient
+  is 20.9400 and estimated edf is 8.666, which indicates a positive
+  parametric coefficient and a highly non-linear relationship. Also, the
+  spline model has a GCV 13.63 and adjusted R-squared 0.296.
+
+- Although results from both models are significant, the adjusted
+  R-squared for the spline model is a bit higher, which indicates better
+  model fit in terms of explaining the variability in the data.
+  Additionally, from the plot, we can see that the spline model captures
+  the non-linear relationship between atmospheric pressure and
+  temperature, providing a more flexible and potentially more accurate
+  representation of the data compared to the linear model. \##
+  Deliverables
 
 - .Rmd file (this file)
 
