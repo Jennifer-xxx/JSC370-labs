@@ -99,7 +99,6 @@ the MET data.
     `mgcv`, `ggplot2`, `leaflet`, `kableExtra`.
 
 ``` r
-# install.packages(c("webshot", "mapview"))
 library(data.table)
 library(dtplyr)
 library(dplyr)
@@ -138,7 +137,16 @@ library(mgcv)
 ``` r
 library(ggplot2)
 library(leaflet)
+library(tidyr)
+library(kableExtra)
 ```
+
+    ## 
+    ## Attaching package: 'kableExtra'
+
+    ## The following object is masked from 'package:dplyr':
+    ## 
+    ##     group_rows
 
 ``` r
 fn <- "https://raw.githubusercontent.com/JSC370/JSC370-2024/main/data/met_all_2023.gz"
@@ -736,6 +744,683 @@ Use the following breakdown for elevation:
 - Low: elev \< 93
 - Mid: elev \>= 93 and elev \< 401
 - High: elev \>= 401
+
+``` r
+# Create breakdown for elevation
+met_elev <- met_dt[,
+                   elev_category := case_when(
+                     elev < 93 ~ "Low",
+                     elev >= 93 & elev < 401 ~ "Mid",
+                     elev >= 401 ~ "High",
+                     TRUE ~ NA)
+                  ]
+
+# Calculate average temperature for each state and elevation category
+summary_table <- met_elev[, 
+                          .(avg_temp = mean(temp, na.rm = TRUE)), 
+                          by = .(STATE, elev_category)]
+
+opts <- options(knitr.kable.NA = "")
+# Generate the summary STATE# Generate the summary table with kable
+summary_table %>%
+  spread(key = elev_category, value = avg_temp) %>%
+  kable(caption = "Average Temperature by Elevation Category and State",
+        digits = 2,
+        align = "cccc") %>%
+  kable_styling()
+```
+
+<table class="table" style="margin-left: auto; margin-right: auto;">
+<caption>
+Average Temperature by Elevation Category and State
+</caption>
+<thead>
+<tr>
+<th style="text-align:center;">
+STATE
+</th>
+<th style="text-align:center;">
+High
+</th>
+<th style="text-align:center;">
+Low
+</th>
+<th style="text-align:center;">
+Mid
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+AL
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+25.07
+</td>
+<td style="text-align:center;">
+23.80
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+AR
+</td>
+<td style="text-align:center;">
+23.72
+</td>
+<td style="text-align:center;">
+25.59
+</td>
+<td style="text-align:center;">
+24.41
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+AZ
+</td>
+<td style="text-align:center;">
+23.90
+</td>
+<td style="text-align:center;">
+29.29
+</td>
+<td style="text-align:center;">
+30.38
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+CA
+</td>
+<td style="text-align:center;">
+18.18
+</td>
+<td style="text-align:center;">
+18.26
+</td>
+<td style="text-align:center;">
+18.77
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+CO
+</td>
+<td style="text-align:center;">
+15.20
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+CT
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+19.37
+</td>
+<td style="text-align:center;">
+18.78
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+DE
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+21.41
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+FL
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+26.61
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+GA
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+24.81
+</td>
+<td style="text-align:center;">
+23.24
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+IA
+</td>
+<td style="text-align:center;">
+21.99
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+22.26
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+ID
+</td>
+<td style="text-align:center;">
+16.47
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+IL
+</td>
+<td style="text-align:center;">
+20.84
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+22.12
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+IN
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+20.13
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+KS
+</td>
+<td style="text-align:center;">
+22.10
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+24.16
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+KY
+</td>
+<td style="text-align:center;">
+20.18
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+21.36
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+LA
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+27.62
+</td>
+<td style="text-align:center;">
+26.09
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MA
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+17.44
+</td>
+<td style="text-align:center;">
+17.59
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MD
+</td>
+<td style="text-align:center;">
+20.65
+</td>
+<td style="text-align:center;">
+21.25
+</td>
+<td style="text-align:center;">
+20.62
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+ME
+</td>
+<td style="text-align:center;">
+15.33
+</td>
+<td style="text-align:center;">
+15.23
+</td>
+<td style="text-align:center;">
+15.44
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MI
+</td>
+<td style="text-align:center;">
+17.98
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+18.54
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MN
+</td>
+<td style="text-align:center;">
+19.93
+</td>
+<td style="text-align:center;">
+22.66
+</td>
+<td style="text-align:center;">
+21.16
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MO
+</td>
+<td style="text-align:center;">
+23.30
+</td>
+<td style="text-align:center;">
+25.80
+</td>
+<td style="text-align:center;">
+23.78
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MS
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+26.34
+</td>
+<td style="text-align:center;">
+25.14
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+MT
+</td>
+<td style="text-align:center;">
+16.33
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NC
+</td>
+<td style="text-align:center;">
+18.05
+</td>
+<td style="text-align:center;">
+22.83
+</td>
+<td style="text-align:center;">
+21.21
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+ND
+</td>
+<td style="text-align:center;">
+20.42
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+21.79
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NE
+</td>
+<td style="text-align:center;">
+21.05
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+23.49
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NH
+</td>
+<td style="text-align:center;">
+7.62
+</td>
+<td style="text-align:center;">
+17.79
+</td>
+<td style="text-align:center;">
+16.78
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NJ
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+19.97
+</td>
+<td style="text-align:center;">
+19.32
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NM
+</td>
+<td style="text-align:center;">
+22.51
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NV
+</td>
+<td style="text-align:center;">
+20.85
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+NY
+</td>
+<td style="text-align:center;">
+15.91
+</td>
+<td style="text-align:center;">
+18.76
+</td>
+<td style="text-align:center;">
+18.31
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+OH
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+19.44
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+OK
+</td>
+<td style="text-align:center;">
+24.00
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+25.08
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+OR
+</td>
+<td style="text-align:center;">
+16.75
+</td>
+<td style="text-align:center;">
+15.20
+</td>
+<td style="text-align:center;">
+16.39
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+PA
+</td>
+<td style="text-align:center;">
+17.29
+</td>
+<td style="text-align:center;">
+20.34
+</td>
+<td style="text-align:center;">
+19.41
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+RI
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+17.88
+</td>
+<td style="text-align:center;">
+17.47
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+SC
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+23.68
+</td>
+<td style="text-align:center;">
+22.41
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+SD
+</td>
+<td style="text-align:center;">
+20.64
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+22.79
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+TN
+</td>
+<td style="text-align:center;">
+19.46
+</td>
+<td style="text-align:center;">
+25.81
+</td>
+<td style="text-align:center;">
+22.90
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+TX
+</td>
+<td style="text-align:center;">
+26.50
+</td>
+<td style="text-align:center;">
+28.74
+</td>
+<td style="text-align:center;">
+28.08
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+UT
+</td>
+<td style="text-align:center;">
+19.76
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+VA
+</td>
+<td style="text-align:center;">
+17.95
+</td>
+<td style="text-align:center;">
+21.35
+</td>
+<td style="text-align:center;">
+20.50
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+VT
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+16.90
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+WA
+</td>
+<td style="text-align:center;">
+16.81
+</td>
+<td style="text-align:center;">
+15.25
+</td>
+<td style="text-align:center;">
+17.81
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+WI
+</td>
+<td style="text-align:center;">
+18.00
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+19.57
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+WV
+</td>
+<td style="text-align:center;">
+17.49
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+19.31
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+WY
+</td>
+<td style="text-align:center;">
+13.76
+</td>
+<td style="text-align:center;">
+</td>
+<td style="text-align:center;">
+</td>
+</tr>
+</tbody>
+</table>
 
 Knit the document, commit your changes, and push them to GitHub.
 
