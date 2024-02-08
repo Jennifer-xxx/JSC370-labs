@@ -99,6 +99,7 @@ the MET data.
     `mgcv`, `ggplot2`, `leaflet`, `kableExtra`.
 
 ``` r
+# install.packages(c("webshot", "mapview"))
 library(data.table)
 library(dtplyr)
 library(dplyr)
@@ -137,15 +138,7 @@ library(mgcv)
 ``` r
 library(ggplot2)
 library(leaflet)
-library(kableExtra)
 ```
-
-    ## 
-    ## Attaching package: 'kableExtra'
-
-    ## The following object is masked from 'package:dplyr':
-    ## 
-    ##     group_rows
 
 ``` r
 fn <- "https://raw.githubusercontent.com/JSC370/JSC370-2024/main/data/met_all_2023.gz"
@@ -397,9 +390,9 @@ state_medians <- met_dt[,
 # Compute the euclidean distance from each station median to the median of the state
 station_euc_state <- left_join(station_median, state_medians, by = "STATE")
 station_euc_state <- station_euc_state[, 
-                                 state_euc_dist := 
-                                   sqrt((temp_50 - state_temp_50)**2 + 
-                                          (wind.sp_50 - state_wind.sp_50)**2)]
+                                       state_euc_dist := 
+                                         sqrt((temp_50 - state_temp_50)**2 + 
+                                                (wind.sp_50 - state_wind.sp_50)**2)]
 
 # Find the stations with minimum euclidean distance in each state
 station_euc_state <- station_euc_state[,
@@ -615,6 +608,120 @@ mid-point (median) of the state. Combining these with the stations you
 identified in the previous question, use `leaflet()` to visualize all
 ~100 points in the same figure, applying different colors for the
 geographic median and the temperature and wind speed median.
+
+``` r
+# Compute the geographic mid-point (median) of the state
+state_geo_medians <- met_dt[,
+                         list(
+                           lon_50=quantile(lon, prob=.5, na.rm=TRUE),
+                           lat_50=quantile(lat, prob=.5, na.rm=TRUE)
+                         ),
+                         by=.(STATE)]
+
+# Find the location of each station
+station_geo <- met_dt[, list(STATE, lon, lat), by=.(USAFID)] %>%
+  unique()
+
+# Compute the euclidean distance from each station to the geographic mid-point of the state
+station_geo_euc <- left_join(station_geo, state_geo_medians, by = "STATE")
+station_geo_euc <- station_geo_euc[, 
+                                   geo_euc_dist := 
+                                     sqrt((lon - lon_50)**2 + 
+                                            (lat - lat_50)**2)]
+
+# Find the stations closest to the geographic mid-point (median) of the state.
+station_geo_euc <- station_geo_euc[,
+                                   .SD[geo_euc_dist == min(geo_euc_dist)],
+                                   by=STATE]
+station_geo_euc
+```
+
+    ##     STATE USAFID      lon    lat   lon_50 lat_50 geo_euc_dist
+    ##  1:    CA 745046 -120.110 36.985 -120.417 36.900   0.31854984
+    ##  2:    TX 722570  -97.717 31.150  -97.804 31.178   0.09139475
+    ##  3:    MI 725405  -84.688 43.322  -84.688 43.433   0.11100000
+    ##  4:    SC 747900  -80.471 33.973  -80.567 33.967   0.09618732
+    ##  5:    IL 724397  -88.916 40.477  -88.751 40.200   0.32241898
+    ##  6:    MO 720869  -92.683 38.947  -92.691 38.658   0.28911071
+    ##  7:    AR 723429  -93.095 35.257  -92.767 35.212   0.33107250
+    ##  8:    OR 726945 -123.283 44.500 -122.863 44.500   0.42000000
+    ##  9:    WA 727930 -122.314 47.445 -122.314 47.277   0.16800000
+    ## 10:    GA 722175  -83.592 32.640  -83.567 32.633   0.02596151
+    ## 11:    MN 726550  -94.052 45.544  -94.204 45.559   0.15273834
+    ## 12:    AL 722300  -86.782 33.178  -86.557 32.915   0.34611270
+    ## 13:    IN 720736  -86.182 41.066  -86.282 40.948   0.15467385
+    ## 14:    NC 722201  -79.101 35.582  -78.984 35.570   0.11761377
+    ## 15:    VA 720498  -77.517 37.400  -77.517 37.317   0.08300000
+    ## 16:    IA 725466  -93.566 41.691  -93.619 41.700   0.05375872
+    ## 17:    PA 725118  -76.855 40.218  -76.922 40.435   0.22710790
+    ## 18:    NE 725513  -97.997 40.893  -98.054 41.189   0.30143822
+    ## 19:    ID 725864 -116.099 44.894 -116.099 44.523   0.37100000
+    ## 20:    WI 726465  -89.667 44.778  -89.774 44.614   0.19581879
+    ## 21:    WV 720328  -80.274 39.000  -80.400 38.890   0.16726028
+    ## 22:    MD 724060  -76.684 39.173  -76.684 38.981   0.19200000
+    ## 23:    AZ 722783 -111.721 33.466 -111.666 33.612   0.15601602
+    ## 24:    OK 723540  -97.383 35.417  -97.223 35.438   0.16137224
+    ## 25:    WY 726720 -108.447 43.062 -108.389 42.796   0.27224989
+    ## 26:    LA 720468  -92.099 30.558  -92.084 30.558   0.01500000
+    ## 27:    KY 720448  -84.770 37.578  -84.770 37.591   0.01300000
+    ## 28:    FL 722213  -81.810 28.821  -81.876 28.474   0.35322089
+    ## 29:    OH 720928  -83.115 40.280  -83.078 40.280   0.03700000
+    ## 30:    NJ 722247  -74.669 40.624  -74.567 40.617   0.10223991
+    ## 31:    NM 722683 -105.535 33.463 -105.990 34.067   0.75620169
+    ## 32:    KS 724506  -97.861 38.068  -97.644 38.068   0.21700000
+    ## 33:    ND 720867 -100.024 48.390 -100.024 47.796   0.59400000
+    ## 34:    VT 726114  -72.615 44.533  -72.565 44.468   0.08200610
+    ## 35:    CO 726396 -105.510 39.050 -105.217 39.217   0.33725065
+    ## 36:    MS 722350  -90.078 32.320  -89.550 32.550   0.57592013
+    ## 37:    CT 720545  -72.506 41.384  -72.682 41.384   0.17600000
+    ## 38:    NV 724770 -116.005 39.601 -116.891 39.183   0.97965300
+    ## 39:    UT 725724 -111.723 40.219 -112.016 40.219   0.29300000
+    ## 40:    SD 726530  -99.318 43.767  -99.318 44.046   0.27900000
+    ## 41:    TN 721031  -86.246 35.380  -86.246 35.593   0.21300000
+    ## 42:    NY 725145  -74.795 41.702  -74.848 42.241   0.54159948
+    ## 43:    RI 725074  -71.412 41.597  -71.432 41.597   0.02000000
+    ## 44:    MA 725098  -71.173 42.191  -71.010 42.160   0.16592167
+    ## 45:    DE 724088  -75.467 39.133  -75.467 39.133   0.00000000
+    ## 46:    NH 726050  -71.503 43.205  -71.517 43.279   0.07531268
+    ## 47:    ME 726073  -69.667 44.533  -69.533 44.533   0.13400000
+    ## 48:    MT 727755 -111.187 47.505 -111.116 46.921   0.58830009
+    ##     STATE USAFID      lon    lat   lon_50 lat_50 geo_euc_dist
+
+``` r
+# Find the locations of such stations
+station_euc_state_map <- left_join(station_euc_state[, list(USAFID)], 
+                                   station_geo, by = "USAFID")
+station_geo_euc  <- left_join(station_geo_euc[, list(USAFID)], 
+                              station_geo, by = "USAFID")
+
+# Visualize all points in the same figure with different colors
+map <- leaflet() %>%
+  addTiles() %>%
+  # temperature and wind speed median
+  addCircleMarkers(
+    data = station_euc_state_map,
+    ~lon, ~lat,
+    color = "red",
+    radius = 3,
+    popup = ~paste("USAFID: ", USAFID, ", State: ", STATE)
+  ) %>%
+  # geographic median
+  addCircleMarkers(
+    data = station_geo_euc,
+    ~lon, ~lat,
+    color = "blue",
+    radius = 3,
+    popup = ~paste("USAFID: ", USAFID, ", State: ", STATE)
+  ) %>%
+  addLegend(
+    colors = c("red", "blue"),
+    labels = c("Temperature and Wind Speed Median", "Geographic Median"),
+    title = "Colors for different Medians"
+  )
+map
+```
+
+![](README_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 Knit the doc and save it on GitHub.
 
