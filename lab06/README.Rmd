@@ -1,13 +1,18 @@
 ---
 title: "Lab 06 - Regular Expressions and Web Scraping"
 author: "Yufei Liu"
-output: html_document
+output: 
+  github_document: default
+  tufte::tufte_html:
+    css: style.css
+always_allow_html: yes
 ---
 
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(include  = TRUE)
 library(xml2)
 library(stringr)
+library(kableExtra)
 ```
 
 
@@ -187,7 +192,7 @@ the XML a bit. We will use the `xml2::xml_children()` function to keep one eleme
 per id. This way, if a paper is missing the abstract, or something else, we will be able to properly match PUBMED IDS with their corresponding records.
 
 
-```{r one-string-per-response, eval = FALSE}
+```{r one-string-per-response, eval = TRUE}
 pub_char_list <- xml2::xml_children(publications)
 pub_char_list <- sapply(pub_char_list, as.character)
 ```
@@ -196,36 +201,64 @@ Now, extract the abstract and article title for each one of the elements of
 `pub_char_list`. You can either use `sapply()` as we just did, or simply
 take advantage of vectorization of `stringr::str_extract`
 
-```{r extracting-last-bit, eval = FALSE}
-abstracts <- str_extract(pub_char_list, "[YOUR REGULAR EXPRESSION]")
-abstracts <- str_remove_all(abstracts, "[CLEAN ALL THE HTML TAGS]")
-abstracts <- str_remove_all(abstracts, "[CLEAN ALL EXTRA WHITE SPACE AND NEW LINES]")
+```{r extracting-last-bit, eval = TRUE}
+# Extract the abstract
+# abstracts <- str_extract(pub_char_list, "<AbstractText>.+?</AbstractText>")
+abstracts <- str_extract(pub_char_list, "<Abstract>(.|\n)+?</Abstract>")
+
+# Clean all the HTML tags
+abstracts <- str_remove_all(abstracts, "<.*?>")
+
+# Clean all extra white space and new lines with an empty space.
+abstracts <- str_replace_all(abstracts, "\\s+", " ")
 # alternatively, you can also use str_replace_all(abstracts, "[ORIGINAL]", "[REPLACEMENT]")
+
+# Find the number of articles without an abstract
+count_na <- sum(is.na(abstracts))
+count_na
 ```
 
   - How many of these don't have an abstract? 
 
-_Answer here._
+_13 of these articles don't have an abstract._
+
+- **Note:** By taking a look at some of the texts, I find out that there are some articles with abstract not enclosed by \<AbstractText\> sth. \<\/AbstractText\> but rather \<AbstractText sth.\> sth. \<\/AbstractText\>. Also, there are several labels of the abstract like BACKGROUND, METHOD, RESULTS, and CONCLUSIONS. The common structure of the abstract is enclosed by \<Abstract\> sth. \<\/Abstract\>. Therefore, I use this structure to find the abstract of the article.
 
 Now, the title
 
-```{r process-titles, eval = FALSE}
-titles <- str_extract(pub_char_list, "[YOUR REGULAR EXPRESSION]")
-titles <- str_remove_all(titles, "[CLEAN ALL THE HTML TAGS]")
+```{r process-titles, eval = TRUE}
+# Extract the title
+titles <- str_extract(pub_char_list, "<ArticleTitle>.+?</ArticleTitle>")
+
+# Clean all the HTML tags
+titles <- str_remove_all(titles, "<.*?>")
+
+# Clean all extra white space and new lines with an empty space.
+titles <- str_replace_all(titles, "\\s+", " ")
+
+# Find the number of articles without a title
+count_na <- sum(is.na(titles))
+count_na
 ```
 
 - How many of these don't have a title ? 
 
-_Answer here._
+_None of these articles don't have an title._
 
 Finally, put everything together into a single `data.frame` and use
 `knitr::kable` to print the results
 
-```{r build-db, eval = FALSE}
+```{r build-db, eval = TRUE}
 database <- data.frame(
-  "[DATA TO CONCATENATE]"
+  ID = ids,
+  Title = titles,
+  Abstract = abstracts
 )
-knitr::kable(database)
+
+#knitr::kable(database)
+# Make the output look better
+kableExtra::scroll_box(knitr::kable(database)) %>%
+  kable_styling()
 
 # The table will likely be huge. How can we make the output look better?
 # (one idea: kableExtra::scroll_box())
