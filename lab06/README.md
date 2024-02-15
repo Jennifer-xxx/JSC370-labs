@@ -11750,7 +11750,7 @@ You can still share the HTML document on github. You can include a link
 in your `README.md` file as the following:
 
 ``` md
-View [here](https://cdn.jsdelivr.net/gh/:user/:repo@:tag/:file) 
+View [here](https://htmlpreview.github.io/?https://github.com/Jennifer-xxx/JSC370-labs/blob/master/lab06/README.html)
 ```
 
 For example, if we wanted to add a direct link the HTML page of lecture
