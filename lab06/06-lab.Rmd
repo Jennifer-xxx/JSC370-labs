@@ -33,7 +33,7 @@ https://pubmed.ncbi.nlm.nih.gov/?term=sars-cov-2
 
 Complete the lines of code:
 
-```{r counter-pubmed, eval=FALSE}
+```{r counter-pubmed, eval=TRUE}
 # Downloading the website
 website <- xml2::read_html("https://pubmed.ncbi.nlm.nih.gov/?term=sars-cov-2")
 
@@ -67,7 +67,7 @@ Use the function `httr::GET()` to make the following query:
 
 The parameters passed to the query are documented [here](https://www.ncbi.nlm.nih.gov/books/NBK25499/).
 
-```{r papers-covid-toronto, eval=FALSE}
+```{r papers-covid-toronto, eval=TRUE}
 library(httr)
 query_ids <- GET(
   url   = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
@@ -87,21 +87,27 @@ data could be using lists with the function `xml2::as_list()`. We will skip the 
 Take a look at the data, and continue with the next question (don't forget to 
 commit and push your results to your GitHub repo!).
 
+```{r}
+# Take a look at the data
+ids_text <- as.character(ids)
+substr(ids_text, 0, 998)
+```
+
 ## Question 3: Get details about the articles
 
 The Ids are wrapped around text in the following way: `<Id>... id number ...</Id>`.
 we can use a regular expression that extract that information. Fill out the
 following lines of code:
 
-```{r get-ids, eval = FALSE}
+```{r get-ids, eval = TRUE}
 # Turn the result into a character vector
 ids <- as.character(ids)
 
 # Find all the ids 
-ids <- stringr::str_extract_all(ids, "PATTERN")[[1]]
+ids <- stringr::str_extract_all(ids, "<Id>[0-9]+</Id>")[[1]]
 
 # Remove all the leading and trailing <Id> </Id>. Make use of "|"
-ids <- stringr::str_remove_all(ids, "PATTERN")
+ids <- stringr::str_remove_all(ids, "<Id>|</Id>")
 ```
 
 With the ids in hand, we can now try to get the abstracts of the papers. As
@@ -117,11 +123,14 @@ before, we will need to coerce the contents (results) to a list using:
     
 **Pro-tip**: If you want `GET()` to take some element literal, wrap it around `I()` (as you would do in a formula in R). For example, the text `"123,456"` is replaced with `"123%2C456"`. If you don't want that behavior, you would need to do the following `I("123,456")`.
     
-```{r get-abstracts, eval = FALSE}
+```{r get-abstracts, eval = TRUE}
 publications <- GET(
-  url   = "BASELINE URL HERE",
+  url   = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
   query = list(
-    "PARAMETERS OF THE QUERY"
+    db = "pubmed",
+    id = paste(ids, collapse = ","),
+    retmax = 300,
+    rettype = "abstract"
     )
 )
 
