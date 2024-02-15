@@ -6,6 +6,8 @@ output: html_document
 
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(include  = TRUE)
+library(xml2)
+library(stringr)
 ```
 
 
@@ -150,10 +152,10 @@ Using the function `stringr::str_extract_all()` applied on `publications_txt`, c
 
 Write a regular expression that captures all such instances
 
-```{r univ-institute-regex, eval = FALSE}
+```{r univ-institute-regex, eval = TRUE}
 institution <- str_extract_all(
   publications_txt,
-  "[YOUR REGULAR EXPRESSION HERE]"
+  "\\bUniversity of \\w+|\\w+ Institute of \\w+"
   ) 
 institution <- unlist(institution)
 as.data.frame(table(institution))
@@ -166,10 +168,10 @@ Repeat the exercise and this time focus on schools and departments in the form o
 
 And tabulate the results
 
-```{r school-department, eval = FALSE}
+```{r school-department, eval = TRUE}
 schools_and_deps <- str_extract_all(
-  abstracts_txt,
-  "[YOUR REGULAR EXPRESSION HERE]"
+  publications_txt,
+  "\\bSchool of \\w+|\\bDepartment of \\w+"
   )
 as.data.frame(table(schools_and_deps))
 ```
