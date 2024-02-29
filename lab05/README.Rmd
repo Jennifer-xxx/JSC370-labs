@@ -1,0 +1,409 @@
+---
+title: "Lab 05 - Data Wrangling"
+output: 
+  github_document: default
+  tufte::tufte_html:
+    css: style.css
+link-citations: yes
+always_allow_html: yes
+---
+
+# Learning goals
+
+- Use the `merge()` function to join two datasets.
+- Deal with missings and impute data.
+- Identify relevant observations using `quantile()`.
+- Practice your GitHub skills.
+
+# Lab description
+
+For this lab we will be dealing with the meteorological dataset `met`. In this case, we will use `data.table` to answer some questions regarding the `met` dataset, while at the same time practice your Git+GitHub skills for this project.
+
+This markdown document should be rendered using `github_document` document.
+
+# Part 1: Setup a Git project and the GitHub repository
+
+1. Go to wherever you are planning to store the data on your computer, and create a folder for this project
+
+2. In that folder, save [this template](https://github.com/JSC370/JSC370-2024/blob/main/labs/lab05/lab05-wrangling-gam.Rmd) as "README.Rmd". This will be the markdown file where all the magic will happen.
+
+3. Go to your GitHub account and create a new repository of the same name that your local folder has, e.g., "JSC370-labs".
+
+4. Initialize the Git project, add the "README.Rmd" file, and make your first commit.
+
+5. Add the repo you just created on GitHub.com to the list of remotes, and push your commit to origin while setting the upstream.
+
+Most of the steps can be done using command line:
+
+```sh
+# Step 1
+cd ~/Documents
+mkdir JSC370-labs
+cd JSC370-labs
+
+# Step 2
+wget https://raw.githubusercontent.com/JSC370/JSC370-2024/main/labs/lab05/lab05-wrangling-gam.Rmd
+mv lab05-wrangling-gam.Rmd README.Rmd
+# if wget is not available,
+curl https://raw.githubusercontent.com/JSC370/JSC370-2024/main/labs/lab05/lab05-wrangling-gam.Rmd --output README.Rmd
+
+# Step 3
+# Happens on github
+
+# Step 4
+git init
+git add README.Rmd
+git commit -m "First commit"
+
+# Step 5
+git remote add origin git@github.com:[username]/JSC370-labs
+git push -u origin master
+```
+
+You can also complete the steps in R (replace with your paths/username when needed)
+
+```r
+# Step 1
+setwd("~/Documents")
+dir.create("JSC370-labs")
+setwd("JSC370-labs")
+
+# Step 2
+download.file(
+  "https://raw.githubusercontent.com/JSC370/JSC370-2024/main/labs/lab05/lab05-wrangling-gam.Rmd",
+  destfile = "README.Rmd"
+  )
+
+# Step 3: Happens on Github
+
+# Step 4
+system("git init && git add README.Rmd")
+system('git commit -m "First commit"')
+
+# Step 5
+system("git remote add origin git@github.com:[username]/JSC370-labs")
+system("git push -u origin master")
+```
+
+Once you are done setting up the project, you can now start working with the MET data.
+
+## Setup in R
+
+1. Load the `data.table` (and the `dtplyr` and `dplyr` packages), `mgcv`, `ggplot2`, `leaflet`, `kableExtra`.
+
+```{r packages, warnings=FALSE, message=FALSE}
+library(data.table)
+library(dtplyr)
+library(dplyr)
+library(mgcv)
+library(ggplot2)
+library(leaflet)
+library(kableExtra)
+library(tidyr)
+library(webshot)
+```
+
+
+```{r, eval=TRUE}
+fn <- "https://raw.githubusercontent.com/JSC370/JSC370-2024/main/data/met_all_2023.gz"
+if (!file.exists("met_all_2023.gz"))
+  download.file(fn, destfile = "met_all_2023.gz")
+met <- data.table::fread("met_all_2023.gz")
+```
+
+2. Load the met data from https://github.com/JSC370/JSC370-2024/main/data/met_all_2023.gz or  (Use https://raw.githubusercontent.com/JSC370/JSC370-2024/main/data/met_all_2023.gz to download programmatically), and also the station data. For the latter, you can use the code we used during lecture to pre-process the stations data:
+
+```{r stations-data, eval = TRUE}
+# Download the data
+stations <- fread("ftp://ftp.ncdc.noaa.gov/pub/data/noaa/isd-history.csv")
+stations[, USAF := as.integer(USAF)]
+
+# Dealing with NAs and 999999
+stations[, USAF   := fifelse(USAF == 999999, NA_integer_, USAF)]
+stations[, CTRY   := fifelse(CTRY == "", NA_character_, CTRY)]
+stations[, STATE  := fifelse(STATE == "", NA_character_, STATE)]
+
+# Selecting the three relevant columns, and keeping unique records
+stations <- unique(stations[, list(USAF, CTRY, STATE, LAT, LON)])
+
+# Dropping NAs
+stations <- stations[!is.na(USAF)]
+
+# Removing duplicates
+stations[, n := 1:.N, by = .(USAF)]
+stations <- stations[n == 1,][, n := NULL]
+
+# Read in the met data and fix lat, lon, temp
+met$lat <- met$lat/1000
+met$lon <- met$lon/1000
+met$wind.sp <- met$wind.sp/10
+met$temp <- met$temp/10
+met$dew.point <- met$dew.point/10
+met$atm.press <- met$atm.press/10
+met$rh <- 100*((112-0.1*met$temp+met$dew.point)/(112+0.9*met$temp))^8
+met_cleaned <- met[temp >= 0 & temp <= 50]
+```
+
+3. Merge the data as we did during the lecture. Use the `merge()` code and you can also try the tidy way with `left_join()`
+
+```{r}
+met_dt <- merge(
+  # Data
+  x     = met_cleaned,      
+  y     = stations, 
+  # List of variables to match
+  by.x  = "USAFID",
+  by.y  = "USAF", 
+  all.x = TRUE,      
+  all.y = FALSE
+)
+nrow(met_dt)
+```
+
+## Question 1: Identifying Representative Stations
+
+Across all weather stations, which stations have the median values of temperature, wind speed, and atmospheric pressure? Using the `quantile()` function, identify these three stations. Do they coincide?
+
+```{r}
+# Compute the median values of temperature, wind speed, and atmospheric pressure
+# globally
+national_medians <- met_dt[,
+                         list(
+                           temp_50=quantile(temp, prob=.5, na.rm=TRUE),
+                           wind.sp_50=quantile(wind.sp, prob=.5, na.rm=TRUE),
+                           atm.press_50=quantile(atm.press, prob=.5, na.rm=TRUE)
+                         )]
+national_medians
+```
+
+Next identify the stations have these median values.
+
+```{r}
+# Compute the median values of temperature, wind speed, and atmospheric pressure
+# for each station
+station_median <- met_dt[,
+                         list(
+                           temp_50=quantile(temp, prob=.5, na.rm=TRUE),
+                           wind.sp_50=quantile(wind.sp, prob=.5, na.rm=TRUE),
+                           atm.press_50=quantile(atm.press, prob=.5, na.rm=TRUE)
+                         ),
+                         by=.(USAFID, STATE)]
+
+# Find which stations have the median values of temperature
+station_median[, temp_dist:=abs(temp_50 - national_medians$temp_50)]
+median_temp_station <- station_median[temp_dist==0]
+median_temp_station[, list(USAFID, temp_50)]
+  
+# Find which stations have the median values of wind speed
+station_median[, wind.sp_dist:=abs(wind.sp_50 - national_medians$wind.sp_50)]
+median_wind.sp_station <- station_median[wind.sp_dist==0]
+median_wind.sp_station[, list(USAFID, wind.sp_50)]
+
+# Find which stations have the median values of atmospheric pressure
+station_median[, atm.press_dist:=abs(atm.press_50 - national_medians$atm.press_50)]
+median_atm.press_station <- station_median[atm.press_dist==0]
+median_atm.press_station[, list(USAFID, atm.press_50)]
+
+# Find the coincide
+coincide <- station_median[temp_dist == 0 & wind.sp_dist == 0 & atm.press_dist == 0]
+coincide
+```
+
+**Answer:** The stations are listed above. They coincide in 1 station - USAFID 723119.
+
+Knit the document, commit your changes, and save it on GitHub. Don't forget to add `README.md` to the tree, the first time you render it.
+
+## Question 2: Identifying Representative Stations per State
+
+Now let's find the weather stations by state with closest temperature and wind speed based on the euclidean distance from these medians. 
+
+```{r, warning=FALSE}
+# Compute the median values of temperature, wind speed, and atmospheric pressure
+# for each state
+state_medians <- met_dt[,
+                         list(
+                           state_temp_50=quantile(temp, prob=.5, na.rm=TRUE),
+                           state_wind.sp_50=quantile(wind.sp, prob=.5, na.rm=TRUE)
+                         ),
+                         by=.(STATE)]
+
+# Compute the euclidean distance from each station median to the median of the state
+station_euc_state <- left_join(station_median, state_medians, by = "STATE")
+station_euc_state <- station_euc_state[, 
+                                       state_euc_dist := 
+                                         sqrt((temp_50 - state_temp_50)**2 + 
+                                                (wind.sp_50 - state_wind.sp_50)**2)]
+
+# Find the stations with minimum euclidean distance in each state
+station_euc_state <- station_euc_state[,
+                                      .SD[state_euc_dist == min(state_euc_dist)],
+                                      by=STATE]
+station_euc_state[, list(USAFID, STATE, temp_50, wind.sp_50, state_temp_50, 
+                           state_wind.sp_50, state_euc_dist)]
+```
+
+Knit the doc and save it on GitHub.
+
+## Question 3: In the Geographic Center?
+
+For each state, identify which station is closest to the geographic mid-point (median) of the state. Combining these with the stations you identified in the previous question, use `leaflet()` to visualize all ~100 points in the same figure, applying different colors for the geographic median and the temperature and wind speed median.
+
+```{r, warning=FALSE}
+# Compute the geographic mid-point (median) of the state
+state_geo_medians <- met_dt[,
+                         list(
+                           lon_50=quantile(lon, prob=.5, na.rm=TRUE),
+                           lat_50=quantile(lat, prob=.5, na.rm=TRUE)
+                         ),
+                         by=.(STATE)]
+
+# Find the location of each station
+station_geo <- met_dt[, list(STATE, lon, lat), by=.(USAFID)] %>%
+  unique()
+
+# Compute the euclidean distance from each station to the geographic mid-point of the state
+station_geo_euc <- left_join(station_geo, state_geo_medians, by = "STATE")
+station_geo_euc <- station_geo_euc[, 
+                                   geo_euc_dist := 
+                                     sqrt((lon - lon_50)**2 + 
+                                            (lat - lat_50)**2)]
+
+# Find the stations closest to the geographic mid-point (median) of the state.
+station_geo_euc <- station_geo_euc[,
+                                   .SD[geo_euc_dist == min(geo_euc_dist)],
+                                   by=STATE]
+station_geo_euc
+```
+
+```{r, warning=FALSE}
+# Find the locations of such stations
+station_euc_state_map <- left_join(station_euc_state[, list(USAFID)], 
+                                   station_geo, by = "USAFID")
+station_geo_euc  <- left_join(station_geo_euc[, list(USAFID)], 
+                              station_geo, by = "USAFID")
+
+# Visualize all points in the same figure with different colors
+map <- leaflet() %>%
+  addTiles() %>%
+  # temperature and wind speed median
+  addCircleMarkers(
+    data = station_euc_state_map,
+    ~lon, ~lat,
+    color = "red",
+    radius = 3,
+    popup = ~paste("USAFID: ", USAFID, ", State: ", STATE)
+  ) %>%
+  # geographic median
+  addCircleMarkers(
+    data = station_geo_euc,
+    ~lon, ~lat,
+    color = "blue",
+    radius = 3,
+    popup = ~paste("USAFID: ", USAFID, ", State: ", STATE)
+  ) %>%
+  addLegend(
+    colors = c("red", "blue"),
+    labels = c("Temperature and Wind Speed Median", "Geographic Median"),
+    title = "Colors for different Medians"
+  )
+map
+```
+
+Knit the doc and save it on GitHub.
+
+## Question 4: Summary Table with `kableExtra`
+
+Generate a summary table using `kable` where the rows are each state and the columns represent average temperature broken down by low, median, and high elevation stations. 
+
+Use the following breakdown for elevation:
+
+- Low: elev < 93
+- Mid: elev >= 93 and elev < 401
+- High: elev >= 401
+
+```{r}
+# Create breakdown for elevation
+met_elev <- met_dt[,
+                   elev_category := case_when(
+                     elev < 93 ~ "Low",
+                     elev >= 93 & elev < 401 ~ "Mid",
+                     elev >= 401 ~ "High",
+                     TRUE ~ NA)
+                  ]
+
+# Calculate average temperature for each state and elevation category
+summary_table <- met_elev[, 
+                          .(avg_temp = mean(temp, na.rm = TRUE)), 
+                          by = .(STATE, elev_category)]
+
+opts <- options(knitr.kable.NA = "")
+# Generate the summary STATE# Generate the summary table with kable
+summary_table %>%
+  spread(key = elev_category, value = avg_temp) %>%
+  kable(caption = "Average Temperature by Elevation Category and State",
+        digits = 2,
+        align = "cccc") %>%
+  kable_styling()
+```
+
+
+Knit the document, commit your changes, and push them to GitHub. 
+
+
+## Question 5: Advanced Regression
+
+Let's practice running regression models with smooth functions on X. We need the `mgcv` package and `gam()` function to do this.
+
+- using your data with the median values per station, first create a lazy table. Filter out values of atmospheric pressure outside of the range 1000 to 1020. Examine the association between temperature (y) and atmospheric pressure (x). Create a scatterplot of the two variables using ggplot2. Add both a linear regression line and a smooth line.
+
+- fit both a linear model and a spline model (use `gam()` with a cubic regression spline on atmospheric pressure). Summarize and plot the results from the models and interpret which model is the best fit and why.
+
+```{r}
+# Create a lazy table
+met_lz <- lazy_dt(station_median, immutable = FALSE)
+
+# Filter out values of atmospheric pressure outside of the range 1000 to 1020
+met_lz <- met_lz %>%
+  filter(atm.press_50 >= 1000 & atm.press_50 <= 1020)
+
+# Create a scatterplot of temperature (y) and atmospheric pressure (x) using ggplot2.
+ggplot(as.data.table(met_lz), aes(x = atm.press_50, y = temp_50)) +
+  geom_point() +
+  geom_smooth(method = "lm", 
+              formula = y ~ x,
+              se = FALSE, 
+              color = "blue") +
+  geom_smooth(method = "gam", 
+              formula = y ~ s(x, bs="cr"),
+              se = FALSE, 
+              color = "red") +
+  labs(x = "Atmospheric Pressure", y = "Temperature")
+
+# Fit a linear model
+linear_model <- lm(temp_50 ~ atm.press_50, data = met_lz)
+# Summarize linear model
+summary(linear_model)
+
+# Fit a spline model using gam
+spline_model <- gam(temp_50 ~ s(atm.press_50, bs="cr"), data = as.data.table(met_lz))
+# Summarize spline model
+summary(spline_model)
+
+# Plot results from both models
+plot(spline_model)
+par(mfrow=c(2,2))
+plot(linear_model)
+
+```
+
+**Answer:**
+- From the scatterplot, we can see that both the linear regression line and the smooth line are going down as atmospheric pressure increases with a moderate absolute slope. This indicates that as atmospheric pressure increases, temperature tends to go down. There is a moderate negative relationship between temperature and atmospheric pressure.
+
+- For the fitted linear model, the p-value < 2.2e-16, which is very small, indicating that we have strong evidence against the null hypothesis. Additionally, the fitted slope is -1.14078, indicating that as atmospheric pressure increases by 1, temperature goes down by 1.14 °C on averages. There is a linear negative relationship between temperature and atmospheric pressure. Also, the linear model has a residual standard error 3.759 and R-squared 0.2642.
+- For the fitted spline model, the p-value of coefficients and smooth terms are both <2e-16, which indicates that we have strong evidence against both null hypothesis. Additionally, the estimated coefficient is 20.9400 and estimated edf is 8.666, which indicates a positive parametric coefficient and a highly non-linear relationship. Also, the spline model has a GCV 13.63 and adjusted R-squared 0.296.
+- Although results from both models are significant, the adjusted R-squared for the spline model is a bit higher, which indicates better model fit in terms of explaining the variability in the data. Additionally, from the plot, we can see that the spline model captures the non-linear relationship between atmospheric pressure and temperature, providing a more flexible and potentially more accurate representation of the data compared to the linear model.
+## Deliverables
+
+- .Rmd file (this file)
+
+- link to the .md file (with all outputs) in your GitHub repository
